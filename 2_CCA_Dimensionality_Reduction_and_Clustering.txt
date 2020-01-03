@@ -1,0 +1,68 @@
+## Combine all of the 20 libraries by RunMultiCCA
+library(Seurat)
+library(Matrix)
+library(dplyr)
+TNBC1 <- readRDS("TNBC1.rds")
+PBMC1 <- readRDS("PBMC1.rds")
+TNBC2 <- readRDS("TNBC2.rds")
+PBMC2 <- readRDS("PBMC2.rds")
+TNBC3 <- readRDS("TNBC3.rds")
+PBMC3 <- readRDS("PBMC3.rds")
+TNBC4 <- readRDS("TNBC4.rds")
+PBMC4 <- readRDS("PBMC4.rds")
+TNBC5 <- readRDS("TNBC5.rds")
+PBMC5 <- readRDS("PBMC5.rds")
+TNBC6 <- readRDS("TNBC6.rds")
+PBMC6 <- readRDS("PBMC6.rds")
+LABC7 <- readRDS("LABC7.rds")
+PBMC7 <- readRDS("PBMC7.rds")
+LABC8 <- readRDS("LABC8.rds")
+PBMC8 <- readRDS("PBMC8.rds")
+LABC9 <- readRDS("LABC9.rds")
+PBMC9 <- readRDS("PBMC9.rds")
+HER2BC10 <- readRDS("HER2BC10.rds")
+PBMC10 <- readRDS("PBMC10.rds")
+
+merge.list <- list(TNBC1,TNBC2,TNBC3,TNBC4,TNBC5,TNBC6,LABC7,LABC8,LABC9,HER2BC10,PBMC1,PBMC2,PBMC3,PBMC4,PBMC5,PBMC6,PBMC7,PBMC8,PBMC9,PBMC10)
+
+genes.use <- c()
+for (i in 1:length(merge.list)) {
+  genes.use <- c(genes.use, head(rownames(merge.list[[i]]@hvg.info), 2000))
+}
+genes.use <- names(which(table(genes.use) > 1))
+for (i in 1:length(merge.list)) {
+  genes.use <- genes.use[genes.use %in% rownames(merge.list[[i]]@scale.data)]
+}
+
+combined <- RunMultiCCA(object.list= merge.list, genes.use = genes.use, num.cc = 30)
+combined <- RunPCA(combined,pc.genes=genes.use,pcs.compute = 50, do.print = TRUE, pcs.print = 1:5, groups.print = 5)
+combined <- RunTSNE(combined, reduction.use = "pca", dims.use = 1:50,do.fast = T)
+combined <- AlignSubspace(combined, reduction.type = "cca", grouping.var = "group", dims.align = 1:30)
+
+## Using DimHeatmap to select CC numbers
+pdf("merge_20_sample.cca.satureation.pdf")
+DimPlot(object =combined, reduction.use = "cca", group.by = "group",pt.size = 0.5, do.return = TRUE)
+VlnPlot(object = combined, features.plot = "CC1", group.by = "group", do.return = TRUE)
+MetageneBicorPlot(combined, grouping.var = "group", dims.eval = 1:30, display.progress = FALSE)
+DimHeatmap(object = combined, reduction.type = "cca", cells.use = 500, dim.use = 1:30, do.balanced = TRUE)
+dev.off()
+## 
+combined <- CalcVarExpRatio(combined,reduction.type="pca",dims.use=1:10,grouping.var="group")
+table(combined@meta.data[combined@meta.data$var.ratio.pca>=0.5,"group"])
+
+for(i in c(10)){
+for(j in c(0.1,0.6,1)) {
+assign(paste("combined_cc",i,"_res", j, sep=""),FindClusters(combined, reduction.type = "cca.aligned", resolution = j, dims.use = 1:i));
+assign(paste("combined_cc",i,"_res",j,"_markers", sep=""), FindAllMarkers(get(paste("combined_cc",i,"_res", j, sep="")),only.pos = TRUE, min.pct = 0.25,thresh.use = 0.25));
+assign(paste("combined_cc",i,"_res",j,"_top10markers", sep=""), get(paste("combined_cc",i,"_res",j,"_markers", sep="")) %>% group_by(cluster) %>% top_n(10, avg_logFC));
+pdf(paste("combined_cc",i,"_res",j,"_heatmap.pdf",sep=""))
+print(DoHeatmap(get(paste("combined_cc",i,"_res",j, sep="")), genes.use = get(paste("combined_cc",i,"_res",j,"_top10markers", sep=""))$gene, slim.col.label = TRUE, remove.key = TRUE))
+assign(paste("combined_cc",i,"_res",j,sep=""),RunTSNE(get(paste("combined_cc",i,"_res",j,sep="")), reduction.use = "cca.aligned", dims.use = 1:i,do.fast = T));
+TSNEPlot(get(paste("combined_cc",i,"_res",j,sep="")), pt.size = 0.5, do.label=T);
+dev.off()
+write.table(get(paste("combined_cc",i,"_res",j,"_markers", sep="")),paste("combined_cc",i,"_res",j,"_markers.xls", sep=""),quote=F,row.names=F)
+saveRDS(get(paste("combined_cc",i,"_res",j,sep="")),paste("combined_cc",i,"_res",j,".rds",sep=""))
+rm(list=paste("combined_cc",i,"_res",j,sep=""))
+gc()
+}
+}

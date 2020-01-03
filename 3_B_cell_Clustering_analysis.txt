@@ -1,0 +1,103 @@
+## Select cell with BCR positive, TCR negative and scRNAseq data for B cell clustering analysis, the cell ID were stored in file
+
+## Combine all of the 20 libraries by RunMultiCCA
+library(Seurat)
+library(Matrix)
+library(dplyr)
+
+TNBC2 <- readRDS("TNBC2.rds")
+TNBC2 <- SubsetData(TNBC2,cells.use=as.vector(TNBC2_BCR_positive_TCR_negative_cell_ID))
+
+PBMC2 <- readRDS("PBMC2.rds")
+PBMC2 <- SubsetData(TNBC2,cells.use=as.vector(PBMC2_BCR_positive_TCR_negative_cell_ID))
+
+TNBC3 <- readRDS("TNBC3.rds")
+TNBC3 <- SubsetData(TNBC2,cells.use=as.vector(TNBC3_BCR_positive_TCR_negative_cell_ID))
+
+PBMC3 <- readRDS("PBMC3.rds")
+PBMC3 <- SubsetData(TNBC2,cells.use=as.vector(PBMC3_BCR_positive_TCR_negative_cell_ID))
+
+TNBC4 <- readRDS("TNBC4.rds")
+TNBC4 <- SubsetData(TNBC2,cells.use=as.vector(TNBC4_BCR_positive_TCR_negative_cell_ID))
+
+PBMC4 <- readRDS("PBMC4.rds")
+PBMC4 <- SubsetData(TNBC2,cells.use=as.vector(PBMC4_BCR_positive_TCR_negative_cell_ID))
+
+TNBC5 <- readRDS("TNBC5.rds")
+TNBC5 <- SubsetData(TNBC2,cells.use=as.vector(TNBC5_BCR_positive_TCR_negative_cell_ID))
+
+PBMC5 <- readRDS("PBMC5.rds")
+PBMC5 <- SubsetData(TNBC2,cells.use=as.vector(PBMC5_BCR_positive_TCR_negative_cell_ID))
+
+TNBC6 <- readRDS("TNBC6.rds")
+TNBC6 <- SubsetData(TNBC2,cells.use=as.vector(TNBC6_BCR_positive_TCR_negative_cell_ID))
+
+PBMC6 <- readRDS("PBMC6.rds")
+PBMC6 <- SubsetData(TNBC2,cells.use=as.vector(PBMC6_BCR_positive_TCR_negative_cell_ID))
+
+PBMC2 <- FindVariableGenes(object =PBMC2, do.plot=F)
+PBMC3 <- FindVariableGenes(object =PBMC3, do.plot=F)
+PBMC4 <- FindVariableGenes(object =PBMC4, do.plot=F)
+PBMC5 <- FindVariableGenes(object =PBMC5, do.plot=F)
+PBMC6 <- FindVariableGenes(object =PBMC6, do.plot=F)
+TNBC3 <- FindVariableGenes(object =TNBC3, do.plot=F)
+TNBC2 <- FindVariableGenes(object =TNBC2, do.plot=F)
+TNBC4 <- FindVariableGenes(object =TNBC4, do.plot=F)
+TNBC5 <- FindVariableGenes(object =TNBC5, do.plot=F)
+TNBC6 <- FindVariableGenes(object =TNBC6, do.plot=F)
+
+PBMC2 <- ScaleData(PBMC2, do.scale=T, do.center=T, vars.to.regress="nUMI")
+PBMC3 <- ScaleData(PBMC3, do.scale=T, do.center=T, vars.to.regress="nUMI")
+PBMC4 <- ScaleData(PBMC4, do.scale=T, do.center=T, vars.to.regress="nUMI")
+PBMC5 <- ScaleData(PBMC5, do.scale=T, do.center=T, vars.to.regress="nUMI")
+PBMC6 <- ScaleData(PBMC6, do.scale=T, do.center=T, vars.to.regress="nUMI")
+TNBC2 <- ScaleData(TNBC2, do.scale=T, do.center=T, vars.to.regress="nUMI")
+TNBC3 <- ScaleData(TNBC3, do.scale=T, do.center=T, vars.to.regress="nUMI")
+TNBC4 <- ScaleData(TNBC4, do.scale=T, do.center=T, vars.to.regress="nUMI")
+TNBC5 <- ScaleData(TNBC5, do.scale=T, do.center=T, vars.to.regress="nUMI")
+TNBC6 <- ScaleData(TNBC6, do.scale=T, do.center=T, vars.to.regress="nUMI")
+
+
+merge.list <- list(TNBC2,TNBC3,TNBC4,TNBC5,TNBC6,PBMC2,PBMC3,PBMC4,PBMC5,PBMC6)
+
+genes.use <- c()
+for (i in 1:length(merge.list)) {
+  genes.use <- c(genes.use, head(rownames(merge.list[[i]]@hvg.info), 2000))
+}
+genes.use <- names(which(table(genes.use) > 1))
+for (i in 1:length(merge.list)) {
+  genes.use <- genes.use[genes.use %in% rownames(merge.list[[i]]@scale.data)]
+}
+
+combined <- RunMultiCCA(object.list= merge.list, genes.use = genes.use, num.cc = 30)
+combined <- RunPCA(combined,pc.genes=genes.use,pcs.compute = 50, do.print = TRUE, pcs.print = 1:5, groups.print = 5)
+combined <- RunTSNE(combined, reduction.use = "pca", dims.use = 1:50,do.fast = T)
+combined <- AlignSubspace(combined, reduction.type = "cca", grouping.var = "group", dims.align = 1:30)
+
+## Using DimHeatmap to select CC numbers
+pdf("merge_TNBC_sample.cca.satureation.pdf")
+DimPlot(object =combined, reduction.use = "cca", group.by = "group",pt.size = 0.5, do.return = TRUE)
+VlnPlot(object = combined, features.plot = "CC1", group.by = "group", do.return = TRUE)
+MetageneBicorPlot(combined, grouping.var = "group", dims.eval = 1:30, display.progress = FALSE)
+DimHeatmap(object = combined, reduction.type = "cca", cells.use = 500, dim.use = 1:30, do.balanced = TRUE)
+dev.off()
+## 
+combined <- CalcVarExpRatio(combined,reduction.type="pca",dims.use=1:10,grouping.var="group")
+table(combined@meta.data[combined@meta.data$var.ratio.pca>=0.5,"group"])
+
+for(i in c(10)){
+for(j in c(0.1,0.6,1)) {
+assign(paste("combined_cc",i,"_res", j, sep=""),FindClusters(combined, reduction.type = "cca.aligned", resolution = j, dims.use = 1:i));
+assign(paste("combined_cc",i,"_res",j,"_markers", sep=""), FindAllMarkers(get(paste("combined_cc",i,"_res", j, sep="")),only.pos = TRUE, min.pct = 0.25,thresh.use = 0.25));
+assign(paste("combined_cc",i,"_res",j,"_top10markers", sep=""), get(paste("combined_cc",i,"_res",j,"_markers", sep="")) %>% group_by(cluster) %>% top_n(10, avg_logFC));
+pdf(paste("combined_cc",i,"_res",j,"_heatmap.pdf",sep=""))
+print(DoHeatmap(get(paste("combined_cc",i,"_res",j, sep="")), genes.use = get(paste("combined_cc",i,"_res",j,"_top10markers", sep=""))$gene, slim.col.label = TRUE, remove.key = TRUE))
+assign(paste("combined_cc",i,"_res",j,sep=""),RunTSNE(get(paste("combined_cc",i,"_res",j,sep="")), reduction.use = "cca.aligned", dims.use = 1:i,do.fast = T));
+TSNEPlot(get(paste("combined_cc",i,"_res",j,sep="")), pt.size = 0.5, do.label=T);
+dev.off()
+write.table(get(paste("combined_cc",i,"_res",j,"_markers", sep="")),paste("combined_cc",i,"_res",j,"_markers.xls", sep=""),quote=F,row.names=F)
+saveRDS(get(paste("combined_cc",i,"_res",j,sep="")),paste("combined_cc",i,"_res",j,".rds",sep=""))
+rm(list=paste("combined_cc",i,"_res",j,sep=""))
+gc()
+}
+}

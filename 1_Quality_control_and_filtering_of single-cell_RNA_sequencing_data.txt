@@ -1,0 +1,52 @@
+## Each library was processed using the same script, and the following is using TNBC6 library as example
+## Using fastq file to generate the feature-barcode matrix
+/cellranger-2.1.1/cellranger count --id=TNBC6_exp --fastqs=TNBC6_exp --sample=TNBC6_exp --transcriptome refdata-cellranger-GRCh38-1.2.0 --localcores=10 --localmem=40
+
+## Run QC and filtering step in R
+library(Seurat)
+library(doubletFinder)
+setwd("/TNBC6_exp/outs/filtered_gene_bc_matrices/GRCh38")
+## import 10x data and creat Seurat object, and filter out genes expressed in less than 1 cells
+TNBC6.data <- Read10X(data.dir = "/TNBC6_exp/outs/filtered_gene_bc_matrices/GRCh38")
+colnames(TNBC6.data) <- paste("TNBC6",colnames(TNBC6.data), sep = "_")
+TNBC6 <- CreateSeuratObject(raw.data = TNBC6.data, min.cells=1, project = "TNBC6")
+TNBC6@meta.data$group <- "TNBC6"
+mito.genes <- grep(pattern = "^MT-", x = rownames(x = TNBC6@data), value = TRUE)
+percent.mito <- Matrix::colSums(TNBC6@raw.data[mito.genes,])/Matrix::colSums(TNBC6@raw.data)
+TNBC6 <- AddMetaData(object = TNBC6, metadata = percent.mito, col.name = "percent.mito")
+pdf("TNBC6_QC.metrix_before_any_filter.pdf")
+VlnPlot(object = TNBC6, features.plot = c("nGene", "nUMI", "percent.mito"), nCol = 3)
+dev.off()
+
+## Remove doublet by doubletFinder
+TNBC6 <- NormalizeData(object = TNBC6, normalization.method = "LogNormalize", scale.factor = 10000)
+TNBC6 <- FindVariableGenes(object = TNBC6, do.plot=F)
+TNBC6@var.genes <- head(rownames(TNBC6@hvg.info),n=2000)
+TNBC6 <- ScaleData(object = TNBC6, do.scale=T, do.center=T, vars.to.regress = "nUMI")
+TNBC6 <- RunPCA(object = TNBC6, pc.genes = rownames(x=head(x=TNBC6@hvg.info,n=2000)), pcs.compute = 20, do.print = TRUE, pcs.print = 1:5, genes.print = 5)
+TNBC6 <- RunTSNE(object = TNBC6, dims.use = 1:20, do.fast = TRUE,seed.use = 0)
+TNBC6 <- doubletFinder(TNBC6,expected.doublets=298)  # The value for expected.doublets was different for diffent libraries, and it was calculated as describe in the method part of the manuscript
+write.table(TNBC6@meta.data,"TNBC6_metadata",quote=F,col.names=NA)
+a <-read.table("TNBC6_metadata",head=T,row.names=1)
+cell_ID <- rownames(a[-c(head(order(a$pANN,decreasing=T),n=298)),])
+TNBC6 <- SubsetData(TNBC6,cells.use=as.vector(cell_ID))
+pdf("TNBC6_QC.metrix_after_doublet_remove.pdf")
+VlnPlot(object = TNBC6, features.plot = c("nGene", "nUMI", "percent.mito"), nCol = 3)
+dev.off()
+
+## Remove cells with more than 5000 genes or less than 200 genes expressed. Remove cells with more than 50% mitochondrial UMI
+TNBC6 <- FilterCells(object = TNBC6, subset.names = c("nGene", "percent.mito"), low.thresholds = c(200, -Inf), high.thresholds = c(5000, 0.5))
+pdf("TNBC6_QC.metrix_after_doublet_remove_after_filter_nGene_and_mito.pdf")
+VlnPlot(object = TNBC6, features.plot = c("nGene", "nUMI", "percent.mito"), nCol = 3)
+dev.off()
+
+## Normalize the data, first log transform and then multi 10000, define variable genes
+TNBC6 <- NormalizeData(object = TNBC6, normalization.method = "LogNormalize", scale.factor = 10000)
+pdf("TNBC6_variablegenes.pdf")
+TNBC6 <- FindVariableGenes(object = TNBC6, do.plot=T)
+TNBC6@var.genes <- head(rownames(TNBC6@hvg.info),n=2000)
+dev.off()
+
+## Regressing out the number of UMI
+TNBC6 <- ScaleData(object = TNBC6, do.scale=T, do.center=T, vars.to.regress = "nUMI")
+saveRDS(TNBC6,"TNBC6.rds")
