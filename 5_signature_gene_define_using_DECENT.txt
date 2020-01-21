@@ -38,4 +38,13 @@ print("DECENT end: ")
 date()
 write.table(de.table,paste0(args[3],"/",args[3],".de.table"),quote=F,sep="\t",row.names=F)
 
-##
+## calculate FDR and define marker genes (FDR<0.01 and LogFC>1)
+args<-commandArgs(T)
+data <- read.table(args[1],head=T)
+fdr <-c();
+fdr <- p.adjust(p=data$pvalue,method="fdr");
+data <- cbind(data,fdr)
+write.table(data,paste0(args[1],".FDR"),sep="\t",quote=F,row.names=F)
+marker <- subset(data,fdr<0.01 & logfc>1)
+write.table(marker,paste0(args[1],".FDR.marker"),sep="\t",quote=F,row.names=F)
+
