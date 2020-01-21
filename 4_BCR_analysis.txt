@@ -9,11 +9,11 @@ MakeDb.py imgt -i TNBC6_BCR.txz -s TNBC6_filtered_contig.fasta --regions --score
 ## select productive IGH
 ParseDb.py select -d TNBC6_BCR_db-pass.tab  -f FUNCTIONAL -u T ## the output file is TNBC6_BCR_db-pass_parse-select.tab
 
-## select cell with single productive IGH by IMGT annotation, the TNBC6_BCR_filtered_contig_annotations.csv file was from cellranger VDJ pipeline
+## select cell with single productive IGH by IMGT annotation, the TNBC6_BCR_filtered_contig_annotations.csv file was from cellranger VDJ pipeline, the selection criteria was described in the method part of the paper
 awk -F '[,\t]' 'NR==FNR{if(NR>1){a[$1]=$0;next}}{if($3 in a)print $16"\t"a[$3]}' TNBC6_BCR_db-pass_parse-select.tab TNBC6_BCR_filtered_contig_annotations.csv | sort -nr | awk -F '[\t]' '{for(i=2;i<=NF;i++){printf $i"\t"}print $1}' | awk -F '[_\t]' '{if(NR==1){a[$1]=$0} else{if($1 in a){a[$1]=a[$1]"\t"$NF}else{a[$1]=$0}}}END{for(i in a){print a[i]}}' | awk -F '[\t]' '{if(NF==42){printf "TNBC6_";for(i=1;i<41;i++){printf $i"\t"};print $41}else{if($42/$43 >=10){printf "TNBC6_";for(i=1;i<41;i++){printf $i"\t"};print $41}} }'> TNBC6_BCR_db-pass_parse-select_single_productive_IGH.tab
 
 
-# Get full sequence germline (junctions are N masked) and D region masked germline sequence, The D region masked germline is useful when you don't want to include D region mutations for somatic hypermuation number calculation
+# Get full sequence germline and D region masked germline sequence
 CreateGermlines.py -d TNBC6_BCR_db-pass_parse-select_single_productive_IGH.tab -g {dmask,full} -r IMGT_Human_IGHV.fasta IMGT_Human_IGHD.fasta IMGT_Human_IGHJ.fasta
 
 ## defined clone by myself (Clone mean two sequences from the same patient and have same GERMLINE_IMGT sequence, which means same assignment for V, D, J and same length of CDR3 region, total 411 clones)
@@ -21,7 +21,7 @@ awk -F '[\t]' '{if(NR==1){print "CLONE\t"$0}else if(NR==2){a[$44"\t"$1]="CLONE"N
 
 sed -i 's/\r//g' 10_sample_db-pass_parse-select_single_productive_IGH_germ-pass_with_sample_ID_patient_ID_clone.tab
 
-## manually calculate mutation number(frequency) to germline (compare GERMLINE_IMGT and SEQUENCE_IMGT), if you want to ignore mutations in the D region, just use the GERMLINE_IMGT_D_MASK to do the compare, change $45 to $46
-awk -F '\t' 'NR==1{print "Mutation_manual_freq\tMutation_manual_count\t"$0;next}{n=0;m=0;split($15,a,"");split($45,b,"");for(i=1;i<=length(a);i++){if(a[i]!=b[i] && b[i]!="." && a[i]!="." && a[i]!="N" && b[i]!="N")n=n+1};for(i=1;i<=length(b);i++){if(b[i]!="." && b[i]!="N")m=m+1}print n/m"\t"n"\t"$0}' 10_sample_db-pass_parse-select_single_productive_IGH_germ-pass_with_sample_ID_patient_ID_clone.tab > 10_sample_db-pass_parse-select_single_productive_IGH_germ-pass_with_sample_ID_patient_ID_clone_mutation_manual.tab
+## manually calculate mutation number(frequency) to germline (compare SEQUENCE_IMGT to GERMLINE_IMGT_D_MASK)
+awk -F '\t' 'NR==1{print "Mutation_manual_freq\tMutation_manual_count\t"$0;next}{n=0;m=0;split($15,a,"");split($46,b,"");for(i=1;i<=length(a);i++){if(a[i]!=b[i] && b[i]!="." && a[i]!="." && a[i]!="N" && b[i]!="N")n=n+1};for(i=1;i<=length(b);i++){if(b[i]!="." && b[i]!="N")m=m+1}print n/m"\t"n"\t"$0}' 10_sample_db-pass_parse-select_single_productive_IGH_germ-pass_with_sample_ID_patient_ID_clone.tab > 10_sample_db-pass_parse-select_single_productive_IGH_germ-pass_with_sample_ID_patient_ID_clone_mutation_manual.tab
 
 
