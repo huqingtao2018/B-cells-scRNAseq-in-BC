@@ -1,1 +1,41 @@
 ## Signature gene define using DECENT(Chengzhong Ye et al., 2018 Bioinformatics)
+## prepare UMI, cell type and batch file
+library(Seurat)
+data <- readRDS("5_tnbc_and_5_pbmc_Bcell_cc10_seurat_object.rds")
+data <- SetAllIdent(data,id="cc10res0.1")
+umi <- as.matrix(data@raw.data)
+print("gene number before filtering:")
+dim(umi)
+print("  ")
+print("gene number after filtering:")
+sel.cell <- colMeans(umi>0)> 0.03
+umi <- umi[rowSums(umi[,sel.cell]>0)>5,]
+print(dim(umi))
+print("  ")
+saveRDS(umi,"umi.rds")
+batch <- as.character(data@meta.data$group)
+saveRDS(batch,"batch.rds")
+
+## Using DECENT to do differential expression
+## args[1] is the filtered umi.rds file
+## args[2] is the batch file
+## args[3] is the cell type name, not the file name
+args <- commandArgs(T)
+library(DECENT)
+umi <- readRDS(args[1])
+print("UMI file loaded:")
+print(dim(umi))
+batch <- readRDS(args[2])
+print("batch file loaded:")
+print(table(batch))
+cell.type <- readRDS(paste0(args[3],".cell.type.rds"))
+print("cell type file loaded:")
+print(table(cell.type))
+print("DECENT start:")
+date()
+de.table <- decent(data.obs = umi, X = ~as.factor(cell.type),W = ~as.factor(batch), n.cores = 5, dir = args[3] )
+print("DECENT end: ")
+date()
+write.table(de.table,paste0(args[3],"/",args[3],".de.table"),quote=F,sep="\t",row.names=F)
+
+##
