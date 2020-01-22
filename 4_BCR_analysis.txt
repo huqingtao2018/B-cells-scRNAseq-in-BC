@@ -19,7 +19,7 @@ CreateGermlines.py -d TNBC6_BCR_db-pass_parse-select_single_productive_IGH.tab -
 awk -F '[\t]' '{if(NR==1){print "CLONE\t"$0}else if(NR==2){a[$44"\t"$1]="CLONE"NR"\t"$0;b[$44"\t"$1]="CLONE"NR"\t"}else{if($44"\t"$1 in a){a[$44"\t"$1]=a[$44"\t"$1]"\n"b[$44"\t"$1]$0}else{a[$44"\t"$1]="CLONE"NR"\t"$0;b[$44"\t"$1]="CLONE"NR"\t"}}}END{for(i in a){print a[i]}}' 10_sample_db-pass_parse-select_single_productive_IGH_germ-pass_with_sample_ID_patient_ID.tab > 10_sample_db-pass_parse-select_single_productive_IGH_germ-pass_with_sample_ID_patient_ID_clone.tab
 sed -i 's/\r//g' 10_sample_db-pass_parse-select_single_productive_IGH_germ-pass_with_sample_ID_patient_ID_clone.tab
 
-## Calculate mutation number(frequency) to germline (compare SEQUENCE_IMGT to GERMLINE_IMGT_D_MASK)
-awk -F '\t' 'NR==1{print "Mutation_manual_freq\tMutation_manual_count\t"$0;next}{n=0;m=0;split($15,a,"");split($46,b,"");for(i=1;i<=length(a);i++){if(a[i]!=b[i] && b[i]!="." && a[i]!="." && a[i]!="N" && b[i]!="N")n=n+1};for(i=1;i<=length(b);i++){if(b[i]!="." && b[i]!="N")m=m+1}print n/m"\t"n"\t"$0}' 10_sample_db-pass_parse-select_single_productive_IGH_germ-pass_with_sample_ID_patient_ID_clone.tab > 10_sample_db-pass_parse-select_single_productive_IGH_germ-pass_with_sample_ID_patient_ID_clone_mutation_manual.tab
+## Calculate mutation number(frequency) to germline (compare SEQUENCE_IMGT at column 25, $25  to GERMLINE_IMGT_D_MASK at column 66, $66)
+awk -F '\t' 'NR==1{print "Mutation_manual_freq\tMutation_manual_count\t"$0;next}{n=0;m=0;split($25,a,"");split($66,b,"");for(i=1;i<=length(a);i++){if(a[i]!=b[i] && b[i]!="." && a[i]!="." && a[i]!="N" && b[i]!="N")n=n+1};for(i=1;i<=length(b);i++){if(b[i]!="." && b[i]!="N")m=m+1}print n/m"\t"n"\t"$0}' 10_sample_db-pass_parse-select_single_productive_IGH_germ-pass_with_sample_ID_patient_ID_clone.tab > 10_sample_db-pass_parse-select_single_productive_IGH_germ-pass_with_sample_ID_patient_ID_clone_mutation_manual.tab
 
 
